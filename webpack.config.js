@@ -48,6 +48,24 @@ const background = {
     },
 };
 
+const svcwrk = {
+    ...common,
+    entry: {
+        svcwrk: path.resolve('src/svcwkr/index.ts'),
+    },
+    externals: { crypto: 'null' },
+    module: {
+        rules: [tsloader],
+    },
+    resolve: {
+        extensions: ['.tsx', '.ts'],
+        fallback: {
+            // 'buffer': buffer,
+            // 'stream': streamBrowserify,
+        },
+    },
+};
+
 const popup = {
     ...common,
     entry: {
@@ -86,4 +104,4 @@ const popup = {
 };
 
 // Mutiple targets for webpack: https://webpack.js.org/concepts/targets/#multiple-targets
-export default [background, popup];
+export default [svcwrk, background, popup];
