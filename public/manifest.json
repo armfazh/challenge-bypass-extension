@@ -1,6 +1,6 @@
 {
     "name": "Privacy Pass: The Client",
-    "manifest_version": 3,
+    "manifest_version": 2,
     "description": "Client support for Privacy Pass anonymous authorization protocol.",
     "version": "4.0.0",
     "icons": {
@@ -10,13 +10,19 @@
         "128": "icons/128/gold.png"
     },
     "background": {
-        "service-worker": "svcwkr.js"
+        "scripts": [
+            "svcwork.js"
+        ]
     },
     "permissions": [
+        "<all_urls>",
         "activeTab",
+        "webRequest",
         "webRequestBlocking"
     ],
-    "action": {
+    "browser_action": {
+        "default_icon": "icons/32/grey.png",
+        "default_title": "Privacy Pass: The Client",
         "default_popup": "popup.html"
     }
 }
