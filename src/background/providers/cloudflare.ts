@@ -125,6 +125,7 @@ export class CloudflareProvider implements Provider {
     private async issue(
         url: string,
         formData: { [key: string]: string[] | string },
+        hdr: Record<string, string>,
     ): Promise<Token[]> {
         const tokens = Array.from(Array(NUMBER_OF_REQUESTED_TOKENS).keys()).map(() => new Token());
         const issuance = {
@@ -139,12 +140,17 @@ export class CloudflareProvider implements Provider {
         });
 
         const headers = {
+            ...hdr,
             'content-type': 'application/x-www-form-urlencoded',
             [ISSUE_HEADER_NAME]: CloudflareProvider.ID.toString(),
         };
 
+        // Object.defineProperty(hdr, 'referrer-policy', { value: 'unsafe-url' })
+        // Object.defineProperty(hdr, 'content-type', { value: 'application/x-www-form-urlencoded' })
+        // Object.defineProperty(hdr, ISSUE_HEADER_NAME, { value: CloudflareProvider.ID.toString() })
+
         const response = await axios.post<string, { data: string }>(url, body, {
-            headers,
+            headers: headers,
             responseType: 'text',
         });
 
@@ -244,12 +250,19 @@ export class CloudflareProvider implements Provider {
             // So we need to extract the token from the Referer header and send it in the query
             // param __cf_chl_f_tk instead. (Note that this token is not a Privacy Pass token.
             let atoken: string | null = null;
+            let hdr = {}
             if (details.requestHeaders !== undefined) {
                 details.requestHeaders.forEach((header) => {
                     // Filter only for Referrer header.
                     if (header.name === 'Referer' && header.value !== undefined) {
                         const url = new URL(header.value);
                         atoken = url.searchParams.get(REFERER_QUERY_PARAM);
+                    }
+                    if (header.name.toLowerCase() === 'origin') {
+                        console.log("Origin: ", header.name, header.value)
+                        Object.defineProperty(hdr, header.name, { value: details.url })
+                    } else {
+                        Object.defineProperty(hdr, header.name, { value: header.value })
                     }
                 });
             }
@@ -260,13 +273,16 @@ export class CloudflareProvider implements Provider {
                     url.searchParams.append(QUERY_PARAM, atoken);
                 }
 
+                if (details.requestHeaders === undefined) { return }
+
                 // Issue tokens.
-                const tokens = await this.issue(url.href, formData);
+                const tokens = await this.issue(url.href, formData, hdr);
                 // Store tokens.
                 const cached = this.getStoredTokens();
                 this.setStoredTokens(cached.concat(tokens));
 
-                this.callbacks.navigateUrl(`${url.origin}${url.pathname}`);
+                console.log("it must navigate to: " + `${url.origin}${url.pathname}`)
+                // this.callbacks.navigateUrl(`${url.origin}${url.pathname}`);
             })();
 
             // TODO I tried to use redirectUrl with data URL or text/html and text/plain but it didn't work, so I continue
