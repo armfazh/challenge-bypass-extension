@@ -52,10 +52,10 @@ const background = {
     },
 };
 
-const blindrsa = {
+const privacypass = {
     ...common,
     entry: {
-        blindrsa: path.resolve('src/blindrsa/index.ts'),
+        privacypass: path.resolve('src/privacypass/index.ts'),
     },
     externals: { crypto: 'null' },
     module: {
@@ -108,4 +108,4 @@ const popup = {
 };
 
 // Mutiple targets for webpack: https://webpack.js.org/concepts/targets/#multiple-targets
-export default [blindrsa, background, popup];
+export default [privacypass, background, popup];
