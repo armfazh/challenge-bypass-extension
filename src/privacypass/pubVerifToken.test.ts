@@ -1,6 +1,8 @@
 import { PublicVerifClient, PublicVerifIssuer } from './pubVerifToken';
 
+import { convertPSSToEnc } from './util';
 import { jest } from '@jest/globals';
+import sjcl from '../blindrsa/sjcl';
 import vectors from './testdata/public_verif_token.json';
 
 function hexToUint8(x: string): Uint8Array {
@@ -11,15 +13,25 @@ function uint8ToHex(x: Uint8Array): string {
     return Buffer.from(x).toString('hex');
 }
 
+function b64ToUint8(x: string): Uint8Array {
+    return new Uint8Array(sjcl.codec.bytes.fromBits(sjcl.codec.base64.toBits(x)));
+}
+
 type Vectors = typeof vectors[number];
+
+test.each(vectors)('devel', async (v: Vectors) => {
+    const publicKeyEnc = hexToUint8(v.pkS);
+    const publicKey = convertPSSToEnc(publicKeyEnc);
+    console.log(publicKey);
+});
 
 async function keysFromVector(v: Vectors): Promise<[CryptoKeyPair, Uint8Array]> {
     const hexEncoded = hexToUint8(v.skS);
     const pem = new TextDecoder().decode(hexEncoded);
     const pemHeader = '-----BEGIN PRIVATE KEY-----';
     const pemFooter = '-----END PRIVATE KEY-----';
-    const pemContents = pem.substring(pemHeader.length, pem.length - pemFooter.length);
-    const payload = new Uint8Array(Buffer.from(pemContents, 'base64'));
+    const pemContents = pem.replace(pemHeader, '').replace(pemFooter, '');
+    const payload = b64ToUint8(pemContents);
 
     const privateKey = await crypto.subtle.importKey(
         'pkcs8',

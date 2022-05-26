@@ -1,4 +1,5 @@
 import { Buffer } from 'buffer';
+import sjcl from '../blindrsa/sjcl';
 
 export class TokenChallenge {
     constructor(
@@ -79,6 +80,20 @@ export interface TokenDetails {
     publicKeyEncoded: Uint8Array;
 }
 
+function tryB64UrlToUint8(x: string): Uint8Array {
+    let bits = [];
+    try {
+        bits = sjcl.codec.base64url.toBits(x);
+    } catch (_) {
+        try {
+            bits = sjcl.codec.base64.toBits(x);
+        } catch (_) {
+            return new Uint8Array();
+        }
+    }
+    return new Uint8Array(sjcl.codec.bytes.fromBits(bits));
+}
+
 export function parseWWWAuthHeader(header: string): TokenDetails[] {
     const challenges = header.split('PrivateToken ');
     const allTokenDetails = new Array<TokenDetails>();
@@ -89,8 +104,8 @@ export function parseWWWAuthHeader(header: string): TokenDetails[] {
         }
 
         const attributes = challenge.split(',');
-        let challengeBlob = Buffer.alloc(0);
-        let tokenKeyEnc = Buffer.alloc(0);
+        let challengeBlob = new Uint8Array();
+        let tokenKeyEnc = new Uint8Array();
 
         // parse attributes of a challenge
         for (const attribute of attributes) {
@@ -100,26 +115,10 @@ export function parseWWWAuthHeader(header: string): TokenDetails[] {
 
             switch (attrKey) {
                 case authorizationAttributeChallenge:
-                    try {
-                        challengeBlob = Buffer.from(attrValue, 'base64url');
-                    } catch (e) {
-                        try {
-                            challengeBlob = Buffer.from(attrValue, 'base64');
-                        } catch (e) {
-                            return [];
-                        }
-                    }
+                    challengeBlob = tryB64UrlToUint8(attrValue);
                     break;
                 case authorizationAttributeTokenKey:
-                    try {
-                        tokenKeyEnc = Buffer.from(attrValue, 'base64url');
-                    } catch (e) {
-                        try {
-                            tokenKeyEnc = Buffer.from(attrValue, 'base64');
-                        } catch (e) {
-                            // optional param
-                        }
-                    }
+                    tokenKeyEnc = tryB64UrlToUint8(attrValue);
                     break;
                 case authorizationAttributeMaxAge:
                     // not used now
@@ -133,7 +132,7 @@ export function parseWWWAuthHeader(header: string): TokenDetails[] {
 
         // Determine type of token
         const type = (challengeBlob[0] << 8) | challengeBlob[1];
-        const attester = 'attester.example';
+        const attester = 'attester.example:4569';
         const details: TokenDetails = {
             type,
             attester,
