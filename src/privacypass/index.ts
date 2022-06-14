@@ -11,6 +11,24 @@ export interface IssuerConfig {
     'origin-name-key-uri': string;
 }
 
+export async function tokenRedemption(
+    details: chrome.webRequest.WebRequestHeadersDetails,
+    t: Token,
+) {
+    const headers = new Headers();
+    if (details.requestHeaders) {
+        details.requestHeaders.forEach((h) => headers.append(h.name, h.value || ''));
+    }
+
+    const encodedToken = uint8ToB64URL(t.serialize());
+    headers.append('Authorization', 'PrivateToken token=' + encodedToken);
+
+    const res = await fetch(details.url, { headers });
+
+    const text = await res.text();
+    console.log('Body recovered: ', text.substring(0, 12));
+}
+
 export async function fetchPublicVerifToken(params: TokenDetails): Promise<Token> {
     // Fetch issuer URL
     const tokenChallenge = TokenChallenge.parse(params.challenge);
@@ -27,7 +45,7 @@ export async function fetchPublicVerifToken(params: TokenDetails): Promise<Token
         true,
         ['verify'],
     );
-    const saltLen = 48 // For SHA-384
+    const saltLen = 48; // For SHA-384
     const client = new PublicVerifClient(publicKey, params.publicKeyEncoded, saltLen);
     const tokenRequest = await client.createTokenRequest(params.challenge);
 
@@ -51,6 +69,7 @@ interface AppState {
     requestId: string;
     origin: string;
     tokenDetails: TokenDetails[];
+    encodedToken?: string;
 }
 
 declare global {
@@ -62,7 +81,7 @@ declare global {
 window.TokenStore = new Map<string, AppState>();
 
 const BasicPublicTokenType = 0x0002;
-const RateLimitedTokenType = 0x0003;
+// const RateLimitedTokenType = 0x0003;
 
 chrome.webRequest.onHeadersReceived.addListener(
     (
@@ -79,52 +98,76 @@ chrome.webRequest.onHeadersReceived.addListener(
             (h) => h.name.toLowerCase() == 'www-authenticate',
         );
 
-        if (header === undefined
-            || header.value === undefined
-            || !header.value.startsWith('PrivateToken')) { return; }
+        if (
+            header === undefined ||
+            header.value === undefined ||
+            !header.value.startsWith('PrivateToken')
+        ) {
+            return;
+        }
 
-        console.log('URL: ', details.url, details.requestId);
+        console.log('HDR Recv: ', details.requestId, details.url);
         // Parse challenges from header and extract tokens
         const tokenDetails = parseWWWAuthHeader(header.value);
-        const value = {
-            requestId: details.requestId,
-            origin: details.url,
-            tokenDetails: tokenDetails,
-        };
-        window.TokenStore.set(details.requestId, value);
-        console.log('token details stored');
-        // This request will be retried (i.e., it will be redirected to
-        // the same url), and the OnBeforeSendHeaders handler will include
-        // a token in the request headers.
-        return { redirectUrl: details.url };
+        console.log('new token details for: ', details.requestId);
+
+        const td = tokenDetails[0];
+        if (td.type === BasicPublicTokenType) {
+            console.log('hara un token');
+            fetchPublicVerifToken(td)
+                .then((token: Token) => {
+                    const encodedToken = uint8ToB64URL(token.serialize());
+                    console.log('creo token for: ', details.requestId, encodedToken);
+                    const value2: AppState = {
+                        requestId: details.requestId,
+                        origin: details.url,
+                        tokenDetails: tokenDetails,
+                        encodedToken: encodedToken,
+                    };
+                    window.TokenStore.set(details.url, value2);
+                    console.log('mandar el nave a redirection');
+                    chrome.tabs.update(details.tabId, { url: details.url });
+                    // This request will be retried (i.e., it will be redirected to
+                    // the same url), and the OnBeforeSendHeaders handler will include
+                    // a token in the Authorization request header.
+                })
+                .catch((e) => {
+                    console.log('could not retrieve tokens error: ', (e as Error).message);
+                });
+        }
+
+        return;
     },
     { urls: ['<all_urls>'] },
     ['responseHeaders', 'blocking'],
 );
 
-export async function tokenRedemption(
-    details: chrome.webRequest.WebRequestHeadersDetails,
-    t: Token,
-) {
-    const headers = new Headers();
-    if (details.requestHeaders) {
-        details.requestHeaders.forEach((h) => headers.append(h.name, h.value || ''))
-    }
-
-    const encodedToken = uint8ToB64URL(t.serialize());
-    headers.append('Authorization', 'PrivateToken token=' + encodedToken);
-
-    const res = await fetch(details.url, { headers })
-
-    const text = await res.text()
-    console.log("Body recovered: ", text.substring(0, 12))
-}
+chrome.webRequest.onBeforeRedirect.addListener(
+    async (_details: chrome.webRequest.WebRedirectionResponseDetails): Promise<void> => {
+        // console.log('BeforeREC: ', details.requestId, details.url);
+        // const state = window.DetailStore.get(details.requestId);
+        // if (!state || state.requestId !== details.requestId) {
+        //     return;
+        // }
+        //
+        // if (state.encodedToken !== undefined) { return }
+        //
+        // if (state.tokenDetails.length === 0) {
+        //     return
+        // }
+        //
+        //
+        //
+        // return;
+    },
+    { urls: ['<all_urls>'] },
+    ['extraHeaders'],
+);
 
 chrome.webRequest.onBeforeSendHeaders.addListener(
     (
         details: chrome.webRequest.WebRequestHeadersDetails,
     ): chrome.webRequest.BlockingResponse | void => {
-
         // Aqui hay dos casos
         // Uno.
         //    Detectar que el redirect vino de onHeadersReceived
@@ -137,46 +180,34 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
         //    Apendejar 1 token a los headers de la request
         //    Continuar
 
-        console.log('URL: ', details.url, details.requestId);
+        console.log('BeforeHDR: ', details.requestId, details.url);
 
-        const state = window.TokenStore.get(details.requestId);
+        const state = window.TokenStore.get(details.url);
         if (!state) {
             return;
         }
 
-        if (state.requestId !== details.requestId) {
+        if (!state.encodedToken) {
             return;
         }
 
-        for (const d of state.tokenDetails) {
-            switch (d.type) {
-                case BasicPublicTokenType:
-                    fetchPublicVerifToken(d)
-                        .then((token) => {
-                            console.log('creo 1 token', token);
-                            tokenRedemption(details, token)
-                            // const encodedToken = uint8ToB64URL(token.serialize());
-                            // const headerWithToken = {
-                            //     name: 'Authorization',
-                            //     value: 'PrivateToken token=' + encodedToken,
-                            // };
-                            // manual redirect
-                            // chrome.tabs.update(details.tabId, { url: details.url });
-                        })
-                        .catch((e) => {
-                            console.log('cannot fetch token: ', e);
-                        });
-                    break;
-                case RateLimitedTokenType:
-                    // todo
-                    break;
-            }
+        console.log('BeforeHDR - si hay token: ', details.requestId, details.url);
+
+        const headers = new Array<chrome.webRequest.HttpHeader>();
+        if (details.requestHeaders) {
+            headers.concat(details.requestHeaders);
         }
-        window.TokenStore.delete(details.requestId);
+
+        headers.push({
+            name: 'Authorization',
+            value: 'PrivateToken token=' + state.encodedToken,
+        });
+
+        window.TokenStore.delete(details.url);
 
         // Cancel this redirect because this function is syncronous and it will
         // not wait for the async call for fetching tokens.
-        return { cancel: true };
+        return { requestHeaders: headers };
     },
     { urls: ['<all_urls>'] },
     ['requestHeaders', 'blocking', 'extraHeaders'],
