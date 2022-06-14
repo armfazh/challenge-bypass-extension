@@ -7,7 +7,7 @@ export class TokenRequest {
         public tokenType: number,
         public tokenKeyId: number,
         public blindedMsg: Uint8Array,
-    ) {}
+    ) { }
 
     serialize(): Uint8Array {
         const output = new Array<Buffer>();
@@ -33,7 +33,7 @@ class TokenPayload {
         public nonce: Uint8Array,
         public context: Uint8Array,
         public keyId: Uint8Array,
-    ) {}
+    ) { }
 
     serialize(): Uint8Array {
         const output = new Array<Buffer>();
@@ -56,7 +56,7 @@ class TokenPayload {
 }
 
 export class Token {
-    constructor(public payload: TokenPayload, public authenticator: Uint8Array) {}
+    constructor(public payload: TokenPayload, public authenticator: Uint8Array) { }
 
     serialize(): Uint8Array {
         return new Uint8Array(Buffer.concat([this.payload.serialize(), this.authenticator]));
@@ -64,7 +64,7 @@ export class Token {
 }
 
 export class TokenResponse {
-    constructor(public blindSig: Uint8Array) {}
+    constructor(public blindSig: Uint8Array) { }
     serialize(): Uint8Array {
         return new Uint8Array(this.blindSig);
     }
@@ -83,7 +83,7 @@ export class PublicVerifClient {
         private readonly publicKey: CryptoKey,
         private readonly publicKeyEnc: Uint8Array,
         private readonly saltLength: number = 0,
-    ) {}
+    ) { }
 
     async createTokenRequest(challenge: Uint8Array): Promise<TokenRequest> {
         // https://www.ietf.org/archive/id/draft-ietf-privacypass-protocol-04.html#name-client-to-issuer-request-2
@@ -94,7 +94,8 @@ export class PublicVerifClient {
         const tokenInput = tokenPayload.serialize();
 
         const { blindedMsg, blindInv } = await blind(this.publicKey, tokenInput, this.saltLength);
-        const tokenKeyId = keyId[0];
+        // todo(spec): verify whether is LSB or MSB.
+        const tokenKeyId = keyId[keyId.length - 1];
         const tokenRequest = new TokenRequest(PublicVerifClient.TYPE, tokenKeyId, blindedMsg);
         this.finData = { tokenInput, tokenPayload, blindInv, tokenRequest };
 

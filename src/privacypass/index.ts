@@ -50,14 +50,27 @@ export async function fetchPublicVerifToken(params: TokenDetails): Promise<Token
     const tokenRequest = await client.createTokenRequest(params.challenge);
 
     // Send TokenRequest to Issuer (fetch w/POST).
-    const issuerResponse = await fetch(issuerConfig['issuer-request-uri'], {
+    const issuerURL = 'https://' + tokenChallenge.issuerName + issuerConfig['issuer-request-uri']
+    const body = tokenRequest.serialize()
+    const issuerResponse = await fetch(issuerURL, {
         method: 'POST',
         headers: { 'Content-Type': 'message/token-request' },
-        body: tokenRequest.serialize().buffer,
+        body: body.buffer,
     });
 
+    const content = (issuerResponse.headers.get('Content-Type') || '').toLowerCase()
+    if (content !== 'message/token-response') {
+        let errMsg = 'failed to retrieve tokens'
+        if (content === 'application/json') {
+            const error: { err: string } = await issuerResponse.json()
+            errMsg = error.err
+        }
+        throw new Error(errMsg)
+    }
+
     //  Receive a TokenResponse,
-    const tokenResponse = new TokenResponse(new Uint8Array(await issuerResponse.arrayBuffer()));
+    const bytes = new Uint8Array(await issuerResponse.arrayBuffer())
+    const tokenResponse = new TokenResponse(bytes);
 
     // Produce a token by Finalizing the TokenResponse.
     const token = client.finalize(tokenResponse);
@@ -110,7 +123,6 @@ chrome.webRequest.onHeadersReceived.addListener(
         // Parse challenges from header and extract tokens
         const tokenDetails = parseWWWAuthHeader(header.value);
         console.log('new token details for: ', details.requestId);
-
         const td = tokenDetails[0];
         if (td.type === BasicPublicTokenType) {
             console.log('hara un token');
