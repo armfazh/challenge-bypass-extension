@@ -6,7 +6,6 @@ export function uint8ToB64URL(x: Uint8Array): string {
     return sjcl.codec.base64url.fromBits(sjcl.codec.bytes.toBits(x));
 }
 
-
 // Convert a RSA-PSS key into a RSA Encryption key.
 // This is required because browsers do not support import RSA-PSS keys.
 //

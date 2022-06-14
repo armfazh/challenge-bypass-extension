@@ -68,6 +68,11 @@ const privacypass = {
             // 'stream': streamBrowserify,
         },
     },
+    plugins: [
+        new CopyWebpackPlugin({
+            patterns: [{ from: 'public/icons', to: 'icons' }, { from: 'public/manifest.json' }],
+        }),
+    ]
 };
 
 const popup = {
@@ -107,5 +112,6 @@ const popup = {
     ],
 };
 
+export const X = [privacypass, background, popup];
 // Mutiple targets for webpack: https://webpack.js.org/concepts/targets/#multiple-targets
-export default [privacypass, background, popup];
+export default [privacypass]

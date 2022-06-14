@@ -2,7 +2,7 @@
     "name": "Privacy Pass",
     "manifest_version": 2,
     "description": "Client support for Privacy Pass anonymous authorization protocol.",
-    "version": "3.0.4",
+    "version": "4.0.0",
     "icons": {
         "32": "icons/32/gold.png",
         "48": "icons/48/gold.png",
@@ -11,7 +11,7 @@
     },
     "background": {
         "scripts": [
-            "background.js"
+            "privacypass.js"
         ]
     },
     "permissions": [
