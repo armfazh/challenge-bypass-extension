@@ -72,14 +72,6 @@ interface AppState {
     encodedToken?: string;
 }
 
-declare global {
-    interface Window {
-        TokenStore: Map<string, AppState>;
-    }
-}
-
-window.TokenStore = new Map<string, AppState>();
-
 const BasicPublicTokenType = 0x0002;
 // const RateLimitedTokenType = 0x0003;
 
@@ -124,7 +116,7 @@ chrome.webRequest.onHeadersReceived.addListener(
                         tokenDetails: tokenDetails,
                         encodedToken: encodedToken,
                     };
-                    window.TokenStore.set(details.url, value2);
+                    chrome.storage.local.set({ url: details.url, state: value2 }); // this is async
                     console.log('mandar el nave a redirection');
                     chrome.tabs.update(details.tabId, { url: details.url });
                     // This request will be retried (i.e., it will be redirected to
@@ -143,7 +135,7 @@ chrome.webRequest.onHeadersReceived.addListener(
 );
 
 chrome.webRequest.onBeforeRedirect.addListener(
-    async (_details: chrome.webRequest.WebRedirectionResponseDetails): Promise<void> => {
+    async (details: chrome.webRequest.WebRedirectionResponseDetails): Promise<void> => {
         // console.log('BeforeREC: ', details.requestId, details.url);
         // const state = window.DetailStore.get(details.requestId);
         // if (!state || state.requestId !== details.requestId) {
@@ -159,6 +151,8 @@ chrome.webRequest.onBeforeRedirect.addListener(
         //
         //
         // return;
+
+        console.log('passo por aqui: URL:', details.url);
     },
     { urls: ['<all_urls>'] },
     ['extraHeaders'],
@@ -182,7 +176,9 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
 
         console.log('BeforeHDR: ', details.requestId, details.url);
 
-        const state = window.TokenStore.get(details.url);
+        // this does NOT work because in MV3 the storage is async
+        // and cannot be called inside this synchronous function.
+        const state = { encodedToken: '' }; //await chrome.storage.local.get(details.url);
         if (!state) {
             return;
         }
@@ -203,7 +199,7 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
             value: 'PrivateToken token=' + state.encodedToken,
         });
 
-        window.TokenStore.delete(details.url);
+        chrome.storage.local.remove(details.url);
 
         // Cancel this redirect because this function is syncronous and it will
         // not wait for the async call for fetching tokens.
