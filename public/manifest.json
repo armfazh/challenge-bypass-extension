@@ -18,7 +18,9 @@
         "<all_urls>",
         "cookies",
         "webRequest",
-        "webRequestBlocking"
+        "webRequestBlocking",
+        "webRequestAuthProvider",
+        "declarativeNetRequestWithHostAccess"
     ],
     "browser_action": {
         "default_icon": "icons/32/grey.png",
