@@ -185,7 +185,7 @@ describe('issuance', () => {
                 },
             };
             provider['issueInfo'] = issueInfo;
-            const details = {
+            const details: chrome.webRequest.WebRequestHeadersDetails = {
                 method: 'POST',
                 url: 'https://captcha.website',
                 requestId: 'xxx',
@@ -200,6 +200,9 @@ describe('issuance', () => {
                         value: 'https://captcha.website/?__cf_chl_tk=token',
                     },
                 ],
+                documentId: '9b298800-a5e6-11ed-afa1-0242ac120002', // fake UUID
+                documentLifecycle: 'active',
+                frameType: 'outermost_frame',
             };
             const result = await provider.handleBeforeSendHeaders(details);
             expect(result).toStrictEqual({ cancel: true });
@@ -241,7 +244,7 @@ describe('issuance', () => {
                 },
             };
             provider['issueInfo'] = issueInfo;
-            const details = {
+            const details: chrome.webRequest.WebRequestHeadersDetails = {
                 method: 'POST',
                 url: 'https://captcha.website/?__cf_chl_f_tk=token',
                 requestId: 'xxx',
@@ -251,6 +254,9 @@ describe('issuance', () => {
                 type: 'xmlhttprequest' as chrome.webRequest.ResourceType,
                 timeStamp: 1,
                 requestHeaders: [],
+                documentId: '9b298800-a5e6-11ed-afa1-0242ac120002', // fake UUID
+                documentLifecycle: 'active',
+                frameType: 'outermost_frame',
             };
             const result = await provider.handleBeforeSendHeaders(details);
             expect(result).toStrictEqual({ cancel: true });
@@ -281,7 +287,7 @@ describe('issuance', () => {
             const provider = new CloudflareProvider(storage, { updateIcon, navigateUrl });
             const issue = jest.fn(async () => []);
             provider['issue'] = issue;
-            const details = {
+            const details: chrome.webRequest.WebRequestHeadersDetails = {
                 method: 'POST',
                 url: 'https://captcha.website',
                 requestId: 'xxx',
@@ -296,6 +302,9 @@ describe('issuance', () => {
                         value: 'https://captcha.website/?__cf_chl_tk=token',
                     },
                 ],
+                documentId: '9b298800-a5e6-11ed-afa1-0242ac120002', // fake UUID
+                documentLifecycle: 'active',
+                frameType: 'outermost_frame',
             };
             const result = await provider.handleBeforeSendHeaders(details);
             expect(result).toBeUndefined();
@@ -447,7 +456,7 @@ describe('redemption', () => {
                 token,
             };
             provider['redeemInfo'] = redeemInfo;
-            const details = {
+            const details: chrome.webRequest.WebRequestHeadersDetails = {
                 method: 'GET',
                 url: 'https://cloudflare.com/',
                 requestId: 'xxx',
@@ -457,6 +466,9 @@ describe('redemption', () => {
                 type: 'main_frame' as chrome.webRequest.ResourceType,
                 timeStamp: 1,
                 requestHeaders: [],
+                documentId: '9b298800-a5e6-11ed-afa1-0242ac120002', // fake UUID
+                documentLifecycle: 'active',
+                frameType: 'outermost_frame',
             };
             const result = provider.handleBeforeSendHeaders(details);
             expect(result).toEqual({
@@ -481,7 +493,7 @@ describe('redemption', () => {
 
             const provider = new CloudflareProvider(storage, { updateIcon, navigateUrl });
 
-            const details = {
+            const details: chrome.webRequest.WebRequestHeadersDetails = {
                 method: 'GET',
                 url: 'https://cloudflare.com/',
                 requestId: 'xxx',
@@ -491,6 +503,9 @@ describe('redemption', () => {
                 type: 'main_frame' as chrome.webRequest.ResourceType,
                 timeStamp: 1,
                 requestHeaders: [],
+                documentId: '9b298800-a5e6-11ed-afa1-0242ac120002', // fake UUID
+                documentLifecycle: 'active',
+                frameType: 'outermost_frame',
             };
             const result = provider.handleBeforeSendHeaders(details);
             expect(result).toBeUndefined();
