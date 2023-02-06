@@ -1,3 +1,7 @@
+import { fetchPublicVerifToken } from '../lib/src/privacypass/index.js';
+import { parseWWWAuthHeader } from '../lib/src/privacypass/httpAuthScheme.js';
+import { uint8ToB64URL } from '../lib/src/privacypass/util.js';
+
 chrome.declarativeNetRequest.getDynamicRules().then((r) => console.log('rules dyn:', r));
 chrome.declarativeNetRequest.getSessionRules().then((r) => console.log('rules ses:', r));
 
@@ -29,6 +33,32 @@ chrome.webRequest.onBeforeRequest.addListener(
     ['extraHeaders'],
 );
 
+async function header_to_token(details, header) {
+    const BasicPublicTokenType = 0x0002;
+    const RateLimitedTokenType = 0x0003;
+
+    const tokenDetails = parseWWWAuthHeader(header);
+    if (tokenDetails.length === 0) { return; }
+
+    console.log('new token details for: ', details.requestId);
+    const td = tokenDetails[0];
+    switch (td.type) {
+        case BasicPublicTokenType:
+            console.log(`type of challenge: ${td.type} is supported`);
+            const token = await fetchPublicVerifToken(td)
+            const encodedToken = uint8ToB64URL(token.serialize());
+            console.log('creo token for: ', details.requestId, encodedToken);
+            return encodedToken;
+
+        case RateLimitedTokenType:
+            console.log(`type of challenge: ${td.type} is not supported yet.`);
+            break;
+        default:
+            console.log(`unrecognized type of challenge: ${td.type}`);
+    }
+    return
+}
+
 chrome.webRequest.onBeforeSendHeaders.addListener(
     async (details) => {
         console.log('onBfeSendHdr', details.requestId);
@@ -36,6 +66,11 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
         console.log('onBfeSendHdr', details.requestHeaders);
         let x = await chrome.storage.local.get(null);
         console.log('onBfeSendHdr (get) value:', x);
+
+        const privateTokenChl = k.key;
+        const w3HeaderValue = header_to_token(details, privateTokenChl);
+        console.log('onBfeSendHdr privateTokenChl:', privateTokenChl);
+        console.log('onBfeSendHdr w3HeaderValue:', w3HeaderValue);
 
         // Add a rule to declarativeNetRequest here
         // if you want to block or modify a header from
@@ -57,7 +92,7 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
                                 {
                                     header: 'www-authenticate',
                                     operation: 'append',
-                                    value: 'x.key',
+                                    value: w3HeaderValue,
                                 },
                             ],
                         },

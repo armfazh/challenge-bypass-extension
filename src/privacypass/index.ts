@@ -109,7 +109,9 @@ chrome.webRequest.onHeadersReceived.addListener(
         console.log('HDR Recv: ', details.requestId, details.url);
         // Parse challenges from header and extract tokens
         const tokenDetails = parseWWWAuthHeader(header.value);
-        if (tokenDetails.length === 0) { return; }
+        if (tokenDetails.length === 0) {
+            return;
+        }
 
         console.log('new token details for: ', details.requestId);
         const td = tokenDetails[0];
@@ -172,19 +174,19 @@ chrome.webRequest.onBeforeRedirect.addListener(
         //
         //
         // return;
-        console.log(`paso por onBeforeRedirect con ID: ${details.requestId} URL: ${details.url}`)
-
+        console.log(`paso por onBeforeRedirect con ID: ${details.requestId} URL: ${details.url}`);
     },
     { urls: ['<all_urls>'] },
     [],
 );
 
 chrome.webRequest.onAuthRequired.addListener(
-    (details: chrome.webRequest.WebAuthenticationChallengeDetails,
+    (
+        details: chrome.webRequest.WebAuthenticationChallengeDetails,
         callback?: (response: chrome.webRequest.BlockingResponse) => void,
     ): void => {
-        console.log(`paso por onAuthRequired con ID: ${details.requestId} URL: ${details.url}`)
-        callback && callback({ authCredentials: { username: "as", password: "asds" } })
+        console.log(`paso por onAuthRequired con ID: ${details.requestId} URL: ${details.url}`);
+        callback && callback({ authCredentials: { username: 'as', password: 'asds' } });
     },
     { urls: ['<all_urls>'] },
     ['blocking'],
@@ -243,7 +245,7 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
         console.log('BeforeHDR - si hay token: ', details.requestId, details.url);
 
         if (!details.requestHeaders) {
-            details.requestHeaders = new Array<chrome.webRequest.HttpHeader>()
+            details.requestHeaders = new Array<chrome.webRequest.HttpHeader>();
         }
         details.requestHeaders.push({
             name: 'Authorization',
