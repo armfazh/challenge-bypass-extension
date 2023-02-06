@@ -6,7 +6,6 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 import webpack from 'webpack';
 
-
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const tsloader = {
@@ -55,7 +54,7 @@ const background = {
 const privacypass = {
     ...common,
     entry: {
-        privacypass: path.resolve('src/privacypass/index.ts'),
+        privacypass: path.resolve('src/privacypass/index.js'),
     },
     externals: { crypto: 'null' },
     module: {
