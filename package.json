@@ -36,7 +36,7 @@
         "stream-browserify": "3.0.0"
     },
     "devDependencies": {
-        "@types/chrome": "0.0.204",
+        "@types/chrome": "0.0.212",
         "@types/jest": "27.0.2",
         "@types/qs": "6.9.6",
         "@types/react": "17.0.5",

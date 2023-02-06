@@ -1,6 +1,6 @@
-import { fetchPublicVerifToken } from '../lib/src/privacypass/index.js';
-import { parseWWWAuthHeader } from '../lib/src/privacypass/httpAuthScheme.js';
-import { uint8ToB64URL } from '../lib/src/privacypass/util.js';
+import { fetchPublicVerifToken } from './pubVerifToken.js';
+import { parseWWWAuthHeader } from './httpAuthScheme.js';
+import { uint8ToB64URL } from './util.js';
 
 chrome.declarativeNetRequest.getDynamicRules().then((r) => console.log('rules dyn:', r));
 chrome.declarativeNetRequest.getSessionRules().then((r) => console.log('rules ses:', r));
@@ -60,11 +60,11 @@ async function header_to_token(details, header) {
 }
 
 chrome.webRequest.onBeforeSendHeaders.addListener(
-    async (details) => {
+    (details) => {
         console.log('onBfeSendHdr', details.requestId);
         console.log('onBfeSendHdr', details.url);
         console.log('onBfeSendHdr', details.requestHeaders);
-        let x = await chrome.storage.local.get(null);
+        let x = chrome.storage.local.get(null);
         console.log('onBfeSendHdr (get) value:', x);
 
         const privateTokenChl = k.key;
