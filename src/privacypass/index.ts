@@ -109,7 +109,9 @@ chrome.webRequest.onHeadersReceived.addListener(
         console.log('HDR Recv: ', details.requestId, details.url);
         // Parse challenges from header and extract tokens
         const tokenDetails = parseWWWAuthHeader(header.value);
-        if (tokenDetails.length === 0) { return; }
+        if (tokenDetails.length === 0) {
+            return;
+        }
 
         console.log('new token details for: ', details.requestId);
         const td = tokenDetails[0];
@@ -119,7 +121,7 @@ chrome.webRequest.onHeadersReceived.addListener(
                 fetchPublicVerifToken(td)
                     .then((token: Token) => {
                         const encodedToken = uint8ToB64URL(token.serialize());
-                        console.log('creo token for: ', details.requestId, encodedToken);
+                        console.log('New token created for: ', details.requestId, encodedToken);
                         const value2: AppState = {
                             requestId: details.requestId,
                             origin: details.url,
@@ -127,7 +129,7 @@ chrome.webRequest.onHeadersReceived.addListener(
                             encodedToken: encodedToken,
                         };
                         window.TokenStore.set(details.url, value2);
-                        console.log('mandar el nave a redirection');
+                        console.log('send browser to rediretion');
                         chrome.tabs.update(details.tabId, { url: details.url });
 
                         // This request will be retried (i.e., it will be redirected to
@@ -137,9 +139,6 @@ chrome.webRequest.onHeadersReceived.addListener(
                     .catch((e) => {
                         console.log('could not retrieve tokens error: ', (e as Error).message);
                     });
-
-                // console.log('mandar el nave a redirection');
-                // return { redirectUrl: details.url }
 
                 break;
             case RateLimitedTokenType:
@@ -172,22 +171,10 @@ chrome.webRequest.onBeforeRedirect.addListener(
         //
         //
         // return;
-        console.log(`paso por onBeforeRedirect con ID: ${details.requestId} URL: ${details.url}`)
-
+        console.log(`method onBeforeRedirect with ID: ${details.requestId} URL: ${details.url}`);
     },
     { urls: ['<all_urls>'] },
     [],
-);
-
-chrome.webRequest.onAuthRequired.addListener(
-    (details: chrome.webRequest.WebAuthenticationChallengeDetails,
-        callback?: (response: chrome.webRequest.BlockingResponse) => void,
-    ): void => {
-        console.log(`paso por onAuthRequired con ID: ${details.requestId} URL: ${details.url}`)
-        callback && callback({ authCredentials: { username: "as", password: "asds" } })
-    },
-    { urls: ['<all_urls>'] },
-    ['blocking'],
 );
 
 const BROWSERS = {
@@ -240,10 +227,10 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
             return;
         }
 
-        console.log('BeforeHDR - si hay token: ', details.requestId, details.url);
+        console.log('BeforeHDR - there is a token!: ', details.requestId, details.url);
 
         if (!details.requestHeaders) {
-            details.requestHeaders = new Array<chrome.webRequest.HttpHeader>()
+            details.requestHeaders = new Array<chrome.webRequest.HttpHeader>();
         }
         details.requestHeaders.push({
             name: 'Authorization',
