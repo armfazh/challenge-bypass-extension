@@ -54,7 +54,7 @@ const background = {
 const privacypass = {
     ...common,
     entry: {
-        privacypass: path.resolve('src/privacypass/index.js'),
+        privacypass: path.resolve('src/privacypass/index.ts'),
     },
     externals: { crypto: 'null' },
     module: {

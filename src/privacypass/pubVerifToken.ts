@@ -136,15 +136,35 @@ const TOKEN_ISSUER_DIRECTORY = '/.well-known/token-issuer-directory';
 const TOKEN_REQUEST_MEDIA_TYPE = 'message/token-request';
 const TOKEN_RESPONSE_MEDIA_TYPE = 'message/token-response';
 
+const IC_ISSUER_REQ_KEY_URI = 'issuer-request-key-uri';
+const IC_ISSUER_REQ_URI = 'issuer-request-uri';
+const IC_TOKEN_KEYS = 'token-keys';
+const IC_TOKEN_TYPE = 'token-type';
+const IC_TOKEN_KEY = 'token-key';
+
+interface IssuerConfiguration {
+    [IC_ISSUER_REQ_KEY_URI]: string;
+    [IC_ISSUER_REQ_URI]: string;
+    [IC_TOKEN_KEYS]: Array<{
+        [IC_TOKEN_TYPE]: number;
+        [IC_TOKEN_KEY]: string;
+        version: number;
+    }>;
+}
+
+interface IssuerError {
+    err: string;
+}
+
 export async function fetchPublicVerifToken(params: TokenDetails): Promise<Token> {
     // Fetch issuer URL
     const tokenChallenge = TokenChallenge.parse(params.challenge);
     const configURI = 'https://' + tokenChallenge.issuerName + TOKEN_ISSUER_DIRECTORY;
     const res = await fetch(configURI);
     if (res.status !== 200) {
-        throw Error(`issuerConfig: no configuration was found at ${configURI}`);
+        throw new Error(`issuerConfig: no configuration was found at ${configURI}`);
     }
-    const issuerConfig = await res.json();
+    const issuerConfig = (await res.json()) as unknown as IssuerConfiguration;
 
     // Create a TokenRequest.
     const spkiEncoded = convertPSSToEnc(params.publicKeyEncoded);
@@ -160,7 +180,8 @@ export async function fetchPublicVerifToken(params: TokenDetails): Promise<Token
     const tokenRequest = await client.createTokenRequest(params.challenge);
 
     // Send TokenRequest to Issuer (fetch w/POST).
-    const issuerURI = 'https://' + tokenChallenge.issuerName + issuerConfig['issuer-request-uri'];
+    const { [IC_ISSUER_REQ_URI]: req_uri } = issuerConfig;
+    const issuerURI = 'https://' + tokenChallenge.issuerName + req_uri;
     const issuerResponse = await fetch(issuerURI, {
         method: 'POST',
         headers: [
@@ -170,12 +191,12 @@ export async function fetchPublicVerifToken(params: TokenDetails): Promise<Token
         body: tokenRequest.serialize().buffer,
     });
     if (issuerResponse.status !== 200) {
-        const e: { err: string } = await issuerResponse.json();
-        throw Error(`tokenRequest: ${e.err}`);
+        const e = (await issuerResponse.json()) as unknown as IssuerError;
+        throw new Error(`tokenRequest: ${e.err}`);
     }
     const contentType = issuerResponse.headers.get('Content-Type');
     if (!contentType || contentType.toLowerCase() !== TOKEN_RESPONSE_MEDIA_TYPE) {
-        throw Error(`tokenRequest: missing ${TOKEN_RESPONSE_MEDIA_TYPE} header`);
+        throw new Error(`tokenRequest: missing ${TOKEN_RESPONSE_MEDIA_TYPE} header`);
     }
 
     //  Receive a TokenResponse,
