@@ -1,15 +1,18 @@
 import { TokenChallenge, TokenDetails } from './httpAuthScheme';
 import { blind, blindSign, finalize } from '../blindrsa';
-import { convertPSSToEnc, uint8ToB64URL } from './util';
 
 import { Buffer } from 'buffer';
+import { convertPSSToEnc } from './util';
+
+export const BasicPublicTokenType = 0x0002;
+export const RateLimitedTokenType = 0x0003;
 
 export class TokenRequest {
     constructor(
         public tokenType: number,
         public tokenKeyId: number,
         public blindedMsg: Uint8Array,
-    ) { }
+    ) {}
 
     serialize(): Uint8Array {
         const output = new Array<Buffer>();
@@ -35,7 +38,7 @@ class TokenPayload {
         public nonce: Uint8Array,
         public context: Uint8Array,
         public keyId: Uint8Array,
-    ) { }
+    ) {}
 
     serialize(): Uint8Array {
         const output = new Array<Buffer>();
@@ -58,7 +61,7 @@ class TokenPayload {
 }
 
 export class Token {
-    constructor(public payload: TokenPayload, public authenticator: Uint8Array) { }
+    constructor(public payload: TokenPayload, public authenticator: Uint8Array) {}
 
     serialize(): Uint8Array {
         return new Uint8Array(Buffer.concat([this.payload.serialize(), this.authenticator]));
@@ -66,14 +69,14 @@ export class Token {
 }
 
 export class TokenResponse {
-    constructor(public blindSig: Uint8Array) { }
+    constructor(public blindSig: Uint8Array) {}
     serialize(): Uint8Array {
         return new Uint8Array(this.blindSig);
     }
 }
 
 export class PublicVerifClient {
-    static TYPE = 0x2;
+    static TYPE = BasicPublicTokenType;
     private finData?: {
         tokenInput: Uint8Array;
         tokenPayload: TokenPayload;
@@ -85,7 +88,7 @@ export class PublicVerifClient {
         private readonly publicKey: CryptoKey,
         private readonly publicKeyEnc: Uint8Array,
         private readonly saltLength: number = 0,
-    ) { }
+    ) {}
 
     async createTokenRequest(challenge: Uint8Array): Promise<TokenRequest> {
         // https://www.ietf.org/archive/id/draft-ietf-privacypass-protocol-04.html#name-client-to-issuer-request-2
@@ -123,6 +126,7 @@ export class PublicVerifClient {
 }
 
 export class PublicVerifIssuer {
+    static TYPE = BasicPublicTokenType;
     static async issue(privateKey: CryptoKey, tokReq: TokenRequest): Promise<TokenResponse> {
         return new TokenResponse(await blindSign(privateKey, tokReq.blindedMsg));
     }
@@ -131,24 +135,6 @@ export class PublicVerifIssuer {
 const TOKEN_ISSUER_DIRECTORY = '/.well-known/token-issuer-directory';
 const TOKEN_REQUEST_MEDIA_TYPE = 'message/token-request';
 const TOKEN_RESPONSE_MEDIA_TYPE = 'message/token-response';
-
-export async function tokenRedemption(
-    details: chrome.webRequest.WebRequestHeadersDetails,
-    t: Token,
-) {
-    const headers = new Headers();
-    if (details.requestHeaders) {
-        details.requestHeaders.forEach((h) => headers.append(h.name, h.value || ''));
-    }
-
-    const encodedToken = uint8ToB64URL(t.serialize());
-    headers.append('Authorization', 'PrivateToken token=' + encodedToken);
-
-    const res = await fetch(details.url, { headers });
-
-    const text = await res.text();
-    console.log('Body recovered: ', text.substring(0, 12));
-}
 
 export async function fetchPublicVerifToken(params: TokenDetails): Promise<Token> {
     // Fetch issuer URL

@@ -1,6 +1,5 @@
 import { PublicVerifClient, PublicVerifIssuer } from './pubVerifToken';
 
-import { convertPSSToEnc } from './util';
 import { jest } from '@jest/globals';
 import sjcl from '../blindrsa/sjcl';
 import vectors from './testdata/public_verif_token.json';
@@ -18,12 +17,6 @@ function b64ToUint8(x: string): Uint8Array {
 }
 
 type Vectors = typeof vectors[number];
-
-test.each(vectors)('devel', async (v: Vectors) => {
-    const publicKeyEnc = hexToUint8(v.pkS);
-    const publicKey = convertPSSToEnc(publicKeyEnc);
-    console.log(publicKey);
-});
 
 async function keysFromVector(v: Vectors): Promise<[CryptoKeyPair, Uint8Array]> {
     const hexEncoded = hexToUint8(v.skS);

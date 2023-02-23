@@ -1,43 +1,32 @@
-import { fetchPublicVerifToken } from './pubVerifToken.ts';
+import { BasicPublicTokenType, RateLimitedTokenType, fetchPublicVerifToken } from './pubVerifToken.ts';
+
 import { parseWWWAuthHeader } from './httpAuthScheme.ts';
 import { uint8ToB64URL } from './util.ts';
-
-const BasicPublicTokenType = 0x0002;
-const RateLimitedTokenType = 0x0003;
 
 chrome.runtime.onInstalled.addListener(async (details) => {
     console.log('start the installation', details);
     chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: [1423] });
 
-    chrome.declarativeNetRequest.onRuleMatchedDebug.addListener((info) => {
-        console.log(`paso por debug:
-        rulesetId:      ${info.rule.rulesetId},
-        ruleId:         ${info.rule.ruleId},
-        frameId:        ${info.request.frameId},
-        initiator:      ${info.request.initiator},
-        method:         ${info.request.method},
-        partentFrameId: ${info.request.partentFrameId},
-        requestId:      ${info.request.requestId},
-        tabId:          ${info.request.tabId},
-        type:           ${info.request.type},
-        url:            ${info.request.url},
-        `);
-    });
+    // chrome.declarativeNetRequest.onRuleMatchedDebug.addListener((info) => {
+    //     console.log(`paso por debug:
+    //     rulesetId:      ${info.rule.rulesetId},
+    //     ruleId:         ${info.rule.ruleId},
+    //     frameId:        ${info.request.frameId},
+    //     initiator:      ${info.request.initiator},
+    //     method:         ${info.request.method},
+    //     partentFrameId: ${info.request.partentFrameId},
+    //     requestId:      ${info.request.requestId},
+    //     tabId:          ${info.request.tabId},
+    //     type:           ${info.request.type},
+    //     url:            ${info.request.url},
+    //     `);
+    // });
 });
 
-chrome.declarativeNetRequest.getDynamicRules().then((r) => console.log('rules dyn:', r));
-chrome.declarativeNetRequest.getSessionRules().then((r) => console.log('rules ses:', r));
+// chrome.declarativeNetRequest.getDynamicRules().then((r) => console.log('rules dyn:', r));
+// chrome.declarativeNetRequest.getSessionRules().then((r) => console.log('rules ses:', r));
 
-chrome.webRequest.onBeforeRequest.addListener(
-    (details) => {
-        console.log('onBfeReq', details.requestId);
-        console.log('onBfeReq', details.url);
-    },
-    { urls: ['<all_urls>'] },
-    ['extraHeaders'],
-);
-
-export async function header_to_token(details, header) {
+async function header_to_token(details, header) {
     const tokenDetails = parseWWWAuthHeader(header);
     if (tokenDetails.length === 0) {
         return;
@@ -66,7 +55,6 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
     async (details) => {
         console.log('onBfeSendHdr', details.requestId);
         console.log('onBfeSendHdr', details.url);
-        console.log('onBfeSendHdr', details.requestHeaders);
 
         const key = details.url;
         const x = await chrome.storage.local.get([key]);
@@ -84,7 +72,7 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
         await chrome.storage.local.remove([key]);
     },
     { urls: ['<all_urls>'] },
-    ['extraHeaders', 'requestHeaders'],
+    [],
 );
 
 chrome.webRequest.onSendHeaders.addListener(
@@ -93,7 +81,7 @@ chrome.webRequest.onSendHeaders.addListener(
         console.log('onSendHdr', details.url);
         console.log('onSendHdr', details.requestHeaders);
 
-        const hdr = details.requestHeaders.find((x) => x.name.toLowerCase() == 'authorization');
+        const hdr = details.requestHeaders.find((x) => x.name.toLowerCase() === 'authorization');
         if (hdr) {
             console.log('the request has a token:', hdr.value);
             // Since the request has a token, we don't need the
@@ -102,7 +90,7 @@ chrome.webRequest.onSendHeaders.addListener(
         }
     },
     { urls: ['<all_urls>'] },
-    ['extraHeaders', 'requestHeaders'],
+    [ 'requestHeaders'],
 );
 
 chrome.webRequest.onHeadersReceived.addListener(
@@ -178,91 +166,7 @@ chrome.webRequest.onHeadersReceived.addListener(
         })(hdr.value).catch((e) => {
             console.log(`onHdrRcv an error: ${e}`);
         });
-
-        // Add a rule to declarativeNetRequest here
-        // if you want to block or modify a header from
-        // this request. The change is applied after finished
-        // this method, and changes can be observed in
-        // ResponseStarted method.
-        //
-        // chrome.declarativeNetRequest.updateSessionRules(
-        //     {
-        //         removeRuleIds: [1423],
-        //         addRules: [
-        //             {
-        //                 id: 1423,
-        //                 priority: 1,
-        //                 // action: { type: 'block' },
-        //                 action: {
-        //                     type: 'redirect',
-        //                     // redirect: { url: "http://example.com" },
-        //                     redirect: {extensionPath: "/popup.html"}
-        //                     // requestHeaders: [
-        //                     //     {
-        //                     //         header: 'authorization',
-        //                     //         operation: 'set',
-        //                     //         value: "some value here",
-        //                     //     },
-        //                     // ],
-        //                 },
-        //                 condition: { resourceTypes: ['main_frame'] },
-        //             },
-        //         ],
-        //     },
-        //     () => {
-        //         console.log('The rule onHdrRcv was succesfully applied');
-        //     },
-        // );
-        //
-        // return { cancel: true };
-        // For some reason, doesn't send to redirect here.
-        // return { redirectUrl: details.url };
     },
     { urls: ['<all_urls>'] },
-    ['extraHeaders', 'responseHeaders'],
+    [ 'responseHeaders'],
 );
-
-chrome.webRequest.onBeforeRedirect.addListener(
-    (details) => {
-        console.log('onBfeRed', details.requestId);
-        console.log('onBfeRed', details.url);
-        console.log('onBfeRed', details.responseHeaders);
-    },
-    { urls: ['<all_urls>'] },
-    ['responseHeaders'],
-);
-
-chrome.webRequest.onResponseStarted.addListener(
-    (details) => {
-        console.log('onRspStd', details.requestId);
-        console.log('onRspStd', details.url);
-        console.log('onRspStd', details.responseHeaders);
-    },
-    { urls: ['<all_urls>'] },
-    ['responseHeaders'],
-);
-
-chrome.webRequest.onCompleted.addListener(
-    (details) => {
-        console.log('onCompt', details.requestId);
-        console.log('onCompt', details.url);
-        console.log('onCompt', details.responseHeaders);
-    },
-    { urls: ['<all_urls>'] },
-    ['responseHeaders', 'extraHeaders'],
-);
-
-chrome.webRequest.onErrorOccurred.addListener(
-    (details) => {
-        console.log('onErr', details.requestId);
-        console.log('onErr', details.url);
-        console.log('onErr', details.responseHeaders);
-    },
-    { urls: ['<all_urls>'] },
-    ['extraHeaders'],
-);
-
-chrome.webRequest.onActionIgnored.addListener((details) => {
-    console.log('onIgn', details.requestId);
-    console.log('onIgn', details.action);
-});
