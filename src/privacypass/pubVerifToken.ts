@@ -9,7 +9,7 @@ export class TokenRequest {
         public tokenType: number,
         public tokenKeyId: number,
         public blindedMsg: Uint8Array,
-    ) {}
+    ) { }
 
     serialize(): Uint8Array {
         const output = new Array<Buffer>();
@@ -35,7 +35,7 @@ class TokenPayload {
         public nonce: Uint8Array,
         public context: Uint8Array,
         public keyId: Uint8Array,
-    ) {}
+    ) { }
 
     serialize(): Uint8Array {
         const output = new Array<Buffer>();
@@ -58,7 +58,7 @@ class TokenPayload {
 }
 
 export class Token {
-    constructor(public payload: TokenPayload, public authenticator: Uint8Array) {}
+    constructor(public payload: TokenPayload, public authenticator: Uint8Array) { }
 
     serialize(): Uint8Array {
         return new Uint8Array(Buffer.concat([this.payload.serialize(), this.authenticator]));
@@ -66,7 +66,7 @@ export class Token {
 }
 
 export class TokenResponse {
-    constructor(public blindSig: Uint8Array) {}
+    constructor(public blindSig: Uint8Array) { }
     serialize(): Uint8Array {
         return new Uint8Array(this.blindSig);
     }
@@ -85,7 +85,7 @@ export class PublicVerifClient {
         private readonly publicKey: CryptoKey,
         private readonly publicKeyEnc: Uint8Array,
         private readonly saltLength: number = 0,
-    ) {}
+    ) { }
 
     async createTokenRequest(challenge: Uint8Array): Promise<TokenRequest> {
         // https://www.ietf.org/archive/id/draft-ietf-privacypass-protocol-04.html#name-client-to-issuer-request-2
@@ -96,7 +96,7 @@ export class PublicVerifClient {
         const tokenInput = tokenPayload.serialize();
 
         const { blindedMsg, blindInv } = await blind(this.publicKey, tokenInput, this.saltLength);
-        const tokenKeyId = keyId[0];
+        const tokenKeyId = keyId[keyId.length - 1];
         const tokenRequest = new TokenRequest(PublicVerifClient.TYPE, tokenKeyId, blindedMsg);
         this.finData = { tokenInput, tokenPayload, blindInv, tokenRequest };
 
@@ -128,7 +128,9 @@ export class PublicVerifIssuer {
     }
 }
 
-const issuerConfigURI = '/.well-known/token-issuer-directory';
+const TOKEN_ISSUER_DIRECTORY = '/.well-known/token-issuer-directory';
+const TOKEN_REQUEST_MEDIA_TYPE = 'message/token-request';
+const TOKEN_RESPONSE_MEDIA_TYPE = 'message/token-response';
 
 export async function tokenRedemption(
     details: chrome.webRequest.WebRequestHeadersDetails,
@@ -151,9 +153,12 @@ export async function tokenRedemption(
 export async function fetchPublicVerifToken(params: TokenDetails): Promise<Token> {
     // Fetch issuer URL
     const tokenChallenge = TokenChallenge.parse(params.challenge);
-    const res = await fetch('https://' + tokenChallenge.issuerName + issuerConfigURI);
+    const configURI = 'https://' + tokenChallenge.issuerName + TOKEN_ISSUER_DIRECTORY;
+    const res = await fetch(configURI);
+    if (res.status !== 200) {
+        throw Error(`issuerConfig: no configuration was found at ${configURI}`);
+    }
     const issuerConfig = await res.json();
-    console.log('issuerConfig: ', issuerConfig);
 
     // Create a TokenRequest.
     const spkiEncoded = convertPSSToEnc(params.publicKeyEncoded);
@@ -169,14 +174,27 @@ export async function fetchPublicVerifToken(params: TokenDetails): Promise<Token
     const tokenRequest = await client.createTokenRequest(params.challenge);
 
     // Send TokenRequest to Issuer (fetch w/POST).
-    const issuerResponse = await fetch(issuerConfig['issuer-request-uri'], {
+    const issuerURI = 'https://' + tokenChallenge.issuerName + issuerConfig['issuer-request-uri'];
+    const issuerResponse = await fetch(issuerURI, {
         method: 'POST',
-        headers: { 'Content-Type': 'message/token-request' },
+        headers: [
+            ['Content-Type', TOKEN_REQUEST_MEDIA_TYPE],
+            ['Accept', TOKEN_RESPONSE_MEDIA_TYPE],
+        ],
         body: tokenRequest.serialize().buffer,
     });
+    if (issuerResponse.status !== 200) {
+        const e: { err: string } = await issuerResponse.json();
+        throw Error(`tokenRequest: ${e.err}`);
+    }
+    const contentType = issuerResponse.headers.get('Content-Type');
+    if (!contentType || contentType.toLowerCase() !== TOKEN_RESPONSE_MEDIA_TYPE) {
+        throw Error(`tokenRequest: missing ${TOKEN_RESPONSE_MEDIA_TYPE} header`);
+    }
 
     //  Receive a TokenResponse,
-    const tokenResponse = new TokenResponse(new Uint8Array(await issuerResponse.arrayBuffer()));
+    const resp = new Uint8Array(await issuerResponse.arrayBuffer());
+    const tokenResponse = new TokenResponse(resp);
 
     // Produce a token by Finalizing the TokenResponse.
     const token = client.finalize(tokenResponse);
